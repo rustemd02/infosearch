@@ -18,25 +18,19 @@ def read_tfidf_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
             parts = line.strip().split()
-            tfidf_dict[parts[0]] = float(parts[2])  # токен/лемма: TF-IDF
+            tfidf_dict[parts[0]] = float(parts[2])
     return tfidf_dict
 
 
 def search(query, tfidf_dir):
-    """
-    Выполняет поиск по TF-IDF для заданного запроса.
-    """
-    query_tokens = query.split()  # Разбиваем запрос на токены
-    query_tfidf_vector = [0] * len(query_tokens)  # Вектор запроса
+    query_tokens = query.split()
+    query_tfidf_vector = [0] * len(query_tokens)
 
-    # Читаем файлы с TF-IDF и создаем вектор запроса
     for i, token in enumerate(query_tokens):
-        query_tfidf_vector[i] = 1  # Просто бинарный вектор запроса
+        query_tfidf_vector[i] = 1
 
-    # Список для хранения пар (номер документа, сходство)
     similarities = []
 
-    # Вычисляем сходство между запросом и каждым документом
     for file_name in os.listdir(tfidf_dir):
         if not file_name.endswith('.txt'):
             continue
