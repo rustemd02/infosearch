@@ -1,6 +1,8 @@
 import os
 import math
+from bs4 import BeautifulSoup
 
+html_dir = '/Users/unterlantas/PycharmProjects/infosearch/task1/downloaded_pages'
 tfidf_dir = '/Users/unterlantas/PycharmProjects/infosearch/task4/tokens_tf_idf'
 
 
@@ -22,7 +24,18 @@ def read_tfidf_file(file_path):
     return tfidf_dict
 
 
-def search(query, tfidf_dir):
+def get_page_title(html_path):
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html = f.read()
+        soup = BeautifulSoup(html, 'html.parser')
+        title_tag = soup.find('title')
+        if title_tag:
+            return title_tag.text.strip()
+        else:
+            return None
+
+
+def search(query):
     query_tokens = query.split()
     query_tfidf_vector = [0] * len(query_tokens)
 
@@ -38,6 +51,10 @@ def search(query, tfidf_dir):
             doc_number = int(file_name.split('.')[0])
         except ValueError:
             continue
+        html_file_path = os.path.join(html_dir, f"{doc_number}.html")
+        title = get_page_title(html_file_path)
+        if title is None:
+            continue
         tfidf_file_path = os.path.join(tfidf_dir, file_name)
         document_tfidf = read_tfidf_file(tfidf_file_path)
 
@@ -46,16 +63,16 @@ def search(query, tfidf_dir):
         similarity = calculate_cosine_similarity(query_tfidf_vector, document_tfidf_vector)
 
         if similarity != 0:
-            similarities.append((doc_number, similarity))
+            similarities.append((doc_number, title, similarity))  # Добавляем номер страницы в список пар
 
-    similarities.sort(key=lambda x: (x[0], x[1]), reverse=False)
+        similarities.sort(key=lambda x: x[2], reverse=True)
 
     return similarities
 
 
 if __name__ == "__main__":
     query = input("Введите поисковый запрос: ")
-    search_results = search(query, tfidf_dir)
+    search_results = search(query)
 
-    for doc_number, similarity in search_results:
-        print(f"Страница: {doc_number}, индекс сходства: {similarity:.5f}")
+    for doc_number, title, similarity in search_results:
+        print(f"{doc_number}. {title}. Индекс сходства: {similarity:.5f}")

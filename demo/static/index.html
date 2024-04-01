@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск</title>
+</head>
+<body>
+    <h1>Поиск</h1>
+    <form id="searchForm">
+        <input type="text" id="query" name="query" placeholder="Введите запрос">
+        <button type="submit">Поиск</button>
+    </form>
+    <div id="searchResults"></div>
+
+    <script>
+        document.getElementById('searchForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            var query = document.getElementById('query').value;
+
+            fetch('/search', {
+                method: 'POST',
+                body: JSON.stringify({query: query}),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                var searchResultsDiv = document.getElementById('searchResults');
+                searchResultsDiv.innerHTML = '';
+                data.forEach(result => {
+                    var resultElement = document.createElement('p');
+                    resultElement.textContent = `${result[0]}. ${result[1]}. Индекс сходства - ${result[2]}`;
+                    searchResultsDiv.appendChild(resultElement);
+                });
+            })
+            .catch(error => console.error('Ошибка:', error));
+        });
+    </script>
+</body>
+</html>
