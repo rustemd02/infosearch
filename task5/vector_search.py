@@ -1,47 +1,67 @@
 import os
-from collections import defaultdict
+import math
 
-lemmas_path = '/Users/unterlantas/PycharmProjects/infosearch/task4/lemmas_tf_idf'
-
-
-def load_index(folder_path):
-    index = defaultdict(dict)
-    for file_name in os.listdir(folder_path):
-        doc_id = file_name.split('.')[0]
-        with open(os.path.join(folder_path, file_name), 'r', encoding='utf-8') as f:
-            for line in f:
-                token, idf, tf_idf = line.strip().split()
-                index[token][doc_id] = (float(idf), float(tf_idf))
-    return index
+tfidf_dir = '/Users/unterlantas/PycharmProjects/infosearch/task4/tokens_tf_idf'
 
 
-def query_to_vector(query, index):
-    query_vector = defaultdict(float)
-    for word in query.split():
-        for doc_id, (idf, tf_idf) in index.get(word, {}).items():
-            query_vector[doc_id] += idf
-    return query_vector
+def calculate_cosine_similarity(vector1, vector2):
+    dot_product = sum(v1 * v2 for v1, v2 in zip(vector1, vector2))
+    magnitude1 = math.sqrt(sum(v ** 2 for v in vector1))
+    magnitude2 = math.sqrt(sum(v ** 2 for v in vector2))
+    if magnitude1 == 0 or magnitude2 == 0:
+        return 0
+    return dot_product / (magnitude1 * magnitude2)
 
 
-def calculate_similarity(query_vector, index):
-    similarity_scores = defaultdict(float)
-    for token, docs in index.items():
-        for doc_id, (idf, tf_idf) in docs.items():
-            if doc_id in query_vector:
-                similarity_scores[doc_id] += query_vector[doc_id] * tf_idf
-    return similarity_scores
+def read_tfidf_file(file_path):
+    tfidf_dict = {}
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            parts = line.strip().split()
+            tfidf_dict[parts[0]] = float(parts[2])  # токен/лемма: TF-IDF
+    return tfidf_dict
 
 
-def vector_search(query, index):
-    query_vector = query_to_vector(query, index)
-    similarity_scores = calculate_similarity(query_vector, index)
-    sorted_docs = sorted(similarity_scores.items(), key=lambda x: x[1], reverse=True)
-    return sorted_docs
+def search(query, tfidf_dir):
+    """
+    Выполняет поиск по TF-IDF для заданного запроса.
+    """
+    query_tokens = query.split()  # Разбиваем запрос на токены
+    query_tfidf_vector = [0] * len(query_tokens)  # Вектор запроса
+
+    # Читаем файлы с TF-IDF и создаем вектор запроса
+    for i, token in enumerate(query_tokens):
+        query_tfidf_vector[i] = 1  # Просто бинарный вектор запроса
+
+    # Список для хранения пар (номер документа, сходство)
+    similarities = []
+
+    # Вычисляем сходство между запросом и каждым документом
+    for file_name in os.listdir(tfidf_dir):
+        if not file_name.endswith('.txt'):
+            continue
+        try:
+            doc_number = int(file_name.split('.')[0])
+        except ValueError:
+            continue
+        tfidf_file_path = os.path.join(tfidf_dir, file_name)
+        document_tfidf = read_tfidf_file(tfidf_file_path)
+
+        document_tfidf_vector = [document_tfidf.get(token, 0) for token in query_tokens]
+
+        similarity = calculate_cosine_similarity(query_tfidf_vector, document_tfidf_vector)
+
+        if similarity != 0:
+            similarities.append((doc_number, similarity))
+
+    similarities.sort(key=lambda x: (x[0], x[1]), reverse=False)
+
+    return similarities
 
 
 if __name__ == "__main__":
-    lemmas_index = load_index(lemmas_path)
-    query = input("\nВведите запрос: ")
-    results = vector_search(query, lemmas_index)
-    for doc_id, score in results:
-        print(f"{doc_id} {score:.5f}")
+    query = input("Введите поисковый запрос: ")
+    search_results = search(query, tfidf_dir)
+
+    for doc_number, similarity in search_results:
+        print(f"Страница: {doc_number}, индекс сходства: {similarity:.5f}")
