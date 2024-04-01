@@ -4,76 +4,80 @@ import math
 from collections import defaultdict
 from bs4 import BeautifulSoup
 
-folder_path = '/Users/unterlantas/PycharmProjects/infosearch/task1/downloaded_pages'
-output_folder = '/Users/unterlantas/PycharmProjects/infosearch/task4/tf_idf'
+output_dirs = ['/Users/unterlantas/PycharmProjects/infosearch/task4/tokens_tf_idf', '/Users/unterlantas/PycharmProjects/infosearch/task4/lemmas_tf_idf']
+for output_dir in output_dirs:
+    os.makedirs(output_dir, exist_ok=True)
 
-def clean_and_extract_words(text):
-    cleaned_text = re.sub(r'[^а-яА-Я\s]', '', text)
-    cleaned_text = cleaned_text.lower()
-    words = cleaned_text.split()
-    return words
+downloaded_pages = '/Users/unterlantas/PycharmProjects/infosearch/task1/downloaded_pages'
+tokens_file = '/Users/unterlantas/PycharmProjects/infosearch/task2/tokens.txt'
+lemmas_file = '/Users/unterlantas/PycharmProjects/infosearch/task2/lemmas.txt'
 
-def load_terms(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return f.read().splitlines()
+if __name__ == '__main__':
+    tokens = set()
+    token_to_lemmas = {}
+    with open(tokens_file, 'r', encoding='utf-8') as f:
+        tokens = set(line.strip() for line in f.readlines())
 
-def load_lemmas(file_path):
-    lemmas = {}
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(lemmas_file, 'r', encoding='utf-8') as f:
         for line in f:
-            lemma_forms = line.strip().split()
-            base_form = lemma_forms[0]
-            for form in lemma_forms:
-                lemmas[form] = base_form
-    return lemmas
+            parts = line.strip().split()
+            token_to_lemmas[parts[0]] = parts[1:]
 
-def extract_text_and_lemmatize(file_path, lemmas):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        soup = BeautifulSoup(f, 'html.parser')
-        text = soup.get_text(separator=' ', strip=True).lower()
-        words = clean_and_extract_words(text)
-        lemmatized_words = [lemmas.get(word, word) for word in words]
-        return words, lemmatized_words
+    df_tokens = defaultdict(int)
+    df_lemmas = defaultdict(int)
 
-def calculate_tf_idf(document_words, corpus_documents, lemmas):
-    tf = defaultdict(float)
-    idf = defaultdict(float)
-    tf_idf = defaultdict(float)
+    num_documents = len(os.listdir(downloaded_pages))
 
-    total_words = len(document_words)
-    word_counts = defaultdict(int)
-    for word in document_words:
-        word_counts[word] += 1
+    for file_name in os.listdir(downloaded_pages):
+        path = os.path.join(downloaded_pages, file_name)
+        with open(path, 'r', encoding='utf-8') as f:
+            html = f.read()
+            soup = BeautifulSoup(html, 'html.parser')
+            text = soup.get_text().lower()
+            words = text.split()
 
-    for word, count in word_counts.items():
-        tf[word] = count / total_words
-        lemma = lemmas.get(word, word)
-        docs_with_word = sum(1 for doc in corpus_documents if lemma in doc)
-        idf[word] = math.log(len(corpus_documents) / (1 + docs_with_word))
-        tf_idf[word] = tf[word] * idf[word]
+            unique_words = set(words)
+            for word in unique_words:
+                if word in tokens:
+                    df_tokens[word] += 1
+                if word in token_to_lemmas:
+                    for lemma in token_to_lemmas[word]:
+                        df_lemmas[lemma] += 1
 
-    return tf, idf, tf_idf
+    idf_tokens = {token: math.log(num_documents / df) for token, df in df_tokens.items()}
+    idf_lemmas = {lemma: math.log(num_documents / df) for lemma, df in df_lemmas.items()}
 
-def main():
-    tokens = load_terms('/Users/unterlantas/PycharmProjects/infosearch/task2/tokens.txt')
-    lemmas = load_lemmas('/Users/unterlantas/PycharmProjects/infosearch/task2/lemmas.txt')
-    documents = []
-    corpus_lemmatized = []
+    for file_name in os.listdir(downloaded_pages):
+        path = os.path.join(downloaded_pages, file_name)
+        with open(path, 'r', encoding='utf-8') as f:
+            html = f.read()
+            soup = BeautifulSoup(html, 'html.parser')
+            text = soup.get_text().lower()
+            words = text.split()
+            total_words = len(words)
 
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.html'):
-            file_path = os.path.join(folder_path, filename)
-            document_words, lemmatized_words = extract_text_and_lemmatize(file_path, lemmas)
-            documents.append(document_words)
-            corpus_lemmatized.append(' '.join(lemmatized_words))
+            tf_tokens = defaultdict(int)
+            tf_lemmas = defaultdict(int)
 
-    for i, (doc_words, lemmatized_text) in enumerate(zip(documents, corpus_lemmatized)):
-        tf, idf, tf_idf = calculate_tf_idf(doc_words, corpus_lemmatized, lemmas)
-        output_file_path = os.path.join(output_folder, f'doc_{i+1}_tf_idf.txt')
-        with open(output_file_path, 'w', encoding='utf-8') as f:
-            for word, tf_idf_value in tf_idf.items():
-                if word in tokens or word in lemmas:
-                    f.write(f"{word} {idf[word]} {tf_idf_value}\n")
+            for word in words:
+                if word in tokens:
+                    tf_tokens[word] += 1
+                if word in token_to_lemmas:
+                    for lemma in token_to_lemmas[word]:
+                        tf_lemmas[lemma] += 1
 
-if __name__ == "__main__":
-    main()
+            tf_tokens = {token: count / total_words for token, count in tf_tokens.items()}
+            tf_lemmas = {lemma: count / total_words for lemma, count in tf_lemmas.items()}
+
+            tokens_tf_idf = {token: (tf * idf_tokens[token]) for token, tf in tf_tokens.items()}
+            lemmas_tf_idf = {lemma: (tf * idf_lemmas.get(lemma, 0)) for lemma, tf in tf_lemmas.items()}
+
+            result_file_name = file_name.replace('.html', '')
+
+            with open(os.path.join('tokens_tf_idf', f'{result_file_name}.txt'), 'w', encoding='utf-8') as f:
+                for token, tf_idf in tokens_tf_idf.items():
+                    f.write(f"{token} {idf_tokens[token]} {tf_idf}\n")
+
+            with open(os.path.join('lemmas_tf_idf', f'{result_file_name}.txt'), 'w', encoding='utf-8') as f:
+                for lemma, tf_idf in lemmas_tf_idf.items():
+                    f.write(f"{lemma} {idf_lemmas.get(lemma, 0)} {tf_idf}\n")
